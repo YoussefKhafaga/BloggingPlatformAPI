@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "hyf/+6rpPFI=",
+  "success": true,
+  "projectFilePath": "D:\\DotNetProjects\\BloggingPlatformApi\\BloggingPlatfromAPI\\BloggingPlatfromAPI.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Win-Pro\\.nuget\\packages\\microsoft.aspnetcore.openapi\\9.0.5\\microsoft.aspnetcore.openapi.9.0.5.nupkg.sha512",
+    "C:\\Users\\Win-Pro\\.nuget\\packages\\microsoft.openapi\\1.6.17\\microsoft.openapi.1.6.17.nupkg.sha512"
+  ],
+  "logs": []
+}
