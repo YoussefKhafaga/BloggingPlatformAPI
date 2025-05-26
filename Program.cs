@@ -1,23 +1,36 @@
+using Microsoft.EntityFrameworkCore;
+using BloggingPlatfromAPI.Data;
+using BloggingPlatfromAPI.Services.PostService;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
+// Add services to the container
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Register DbContext
+builder.Services.AddDbContext<BlogDbContext>(options =>
+    options.UseMySql(
+        builder.Configuration.GetConnectionString("BloggingPlatformDb"),
+        ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("BloggingPlatformDb"))
+    )
+);
+
+// Register your services
+builder.Services.AddScoped<IPostService, PostService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Enable Swagger UI and JSON
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
-
+// Use routing and controllers
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();
