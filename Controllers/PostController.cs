@@ -40,6 +40,10 @@ namespace BloggingPlatfromAPI.Controllers
         [ProducesResponseType(200)]
         public async Task<IActionResult> GetPosts([FromQuery] string? term, [FromQuery] int pageNumber, [FromQuery] int PageSize)
         {
+            if (term == null)
+            {
+                term = string.Empty;
+            }
             var posts = await _postService.GetAllPosts(term, pageNumber, PageSize);
             if (posts == null)
             {

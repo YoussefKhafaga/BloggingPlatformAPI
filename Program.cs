@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using BloggingPlatfromAPI.Data;
 using BloggingPlatfromAPI.Services.PostService;
+using BloggingPlatfromAPI.Repositories.PostRepository;
+using BloggingPlatfromAPI.Repositories.CategoryRepositoy;
+using BloggingPlatfromAPI.Repositories.TagRepository;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,6 +11,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<IPostRepository, PostRepository>();
+builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+builder.Services.AddScoped<ITagRepository, TagRepository>();
 
 // Register DbContext
 builder.Services.AddDbContext<BlogDbContext>(options =>

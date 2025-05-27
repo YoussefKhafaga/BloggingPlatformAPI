@@ -4,6 +4,9 @@ using BloggingPlatfromAPI.DTOs;
 using BloggingPlatfromAPI.DTOs.PostDTOs;
 using BloggingPlatfromAPI.Helpers;
 using BloggingPlatfromAPI.Model;
+using BloggingPlatfromAPI.Repositories.CategoryRepositoy;
+using BloggingPlatfromAPI.Repositories.PostRepository;
+using BloggingPlatfromAPI.Repositories.TagRepository;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,21 +14,23 @@ namespace BloggingPlatfromAPI.Services.PostService;
 
 public class PostService : IPostService
 {
-    private readonly BlogDbContext _context;
-    public PostService(BlogDbContext context)
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IPostRepository _postRepository;
+    private readonly ICategoryRepository _categoryRepository;
+    private readonly ITagRepository _tagRepository;
+    public PostService(IPostRepository postRepository, IUnitOfWork unitOfWork, ICategoryRepository categoryRepository,
+        ITagRepository tagRepository)
     {
-        _context = context;
+        _postRepository = postRepository;
+        _unitOfWork = unitOfWork;
+        _categoryRepository = categoryRepository;
+        _tagRepository = tagRepository;
     }
+
 
     public async Task<PostReadDTO> CreatePost(PostCreateDTO postCreateDTO)
     {
-        var category = await _context.categories
-        .FirstOrDefaultAsync(c => c.Name == postCreateDTO.Category);
-        if (category == null)
-        {
-            category = new Category { Name = postCreateDTO.Category };
-            _context.categories.Add(category);
-        }
+        var category = await _categoryRepository.GetCategoryByNameAsync(postCreateDTO.Category);
         var post = new Post
         {
             Title = postCreateDTO.Title,
@@ -37,18 +42,17 @@ public class PostService : IPostService
         {
             foreach (var tagName in postCreateDTO.Tags)
             {
-                var tag = await _context.tags
-                    .FirstOrDefaultAsync(t => t.Name == tagName);
+                var tag = await _tagRepository.GetTagByNameAsync(tagName);
                 if (tag == null)
                 {
-                    tag = new Tag { Name = tagName };
-                    _context.tags.Add(tag);
+                    tag = await _tagRepository.CreateTagAsync(tagName);
                 }
                 post.Tags.Add(new PostTags { Post = post, Tag = tag });
             }
+
         }
-        _context.posts.Add(post);
-        await _context.SaveChangesAsync();
+        await _postRepository.CreatePostAsync(post);
+        await _unitOfWork.CompleteAsync();
         return new PostReadDTO
         {
             Id = post.Id,
@@ -63,34 +67,19 @@ public class PostService : IPostService
 
     public async Task<bool> DeletePost(int id)
     {
-        var post = await _context.posts.FindAsync(id);
+        var post = await _postRepository.GetPostByIdAsync(id);
         if (post == null) return false;
-         _context.posts.Remove(post);
-        await _context.SaveChangesAsync();
+        _postRepository.DeletePost(post);
+        await _unitOfWork.CompleteAsync();
         return true;
 
     }
 
     public async Task<PageResult<PostReadDTO>> GetAllPosts([FromQuery] string? term, [FromQuery] int pageNumber, [FromQuery] int PageSize)
     {
-        var query = _context.posts
-        .Include(category => category.Category)
-        .Include(postTag => postTag.Tags)
-        .ThenInclude(postTag => postTag.Tag)
-        .AsQueryable();
-
-        if (!string.IsNullOrEmpty(term))
-        {
-            term = term.ToLower();
-            query = query.Where(post => post.Title.ToLower().Contains(term) || post.Content.ToLower().Contains(term) || post.Category.Name.ToLower().Contains(term));
-        }
-        var totalItems = await query.CountAsync();
-        var posts = await query
-        .Skip((pageNumber - 1) * PageSize)
-        .Take(PageSize)
-        .ToListAsync();
-
-        var postDtos = posts.Select(post => new PostReadDTO
+        var posts = await _postRepository.GetAllPostsAsync(pageNumber, PageSize, term);
+        var totalItems = posts.TotalCount;
+        var postDtos = posts.Items.Select(post => new PostReadDTO
         {
             Id = post.Id,
             Title = post.Title,
@@ -98,9 +87,8 @@ public class PostService : IPostService
             CreatedAt = post.CreatedAt,
             UpdatedAt = post.UpdatedAt,
             Category = post.Category?.Name,
-            Tags = post.Tags.Select(tag => tag.Tag.Name).ToList()
+            Tags = post.Tags.Select(pt => pt.Tag.Name).ToList()
         });
-
         return new PageResult<PostReadDTO>
         {
             Items = postDtos.ToList(),
@@ -112,11 +100,7 @@ public class PostService : IPostService
 
     public async Task<PostReadDTO> GetPostById(int id)
     {
-        var post = await _context.posts
-            .Include(p => p.Category)
-            .Include(p => p.Tags)
-            .ThenInclude(pt => pt.Tag)
-            .FirstOrDefaultAsync(p => p.Id == id);
+        var post = await _postRepository.GetPostByIdAsync(id);
 
         if (post == null) return null;
 
@@ -136,15 +120,10 @@ public class PostService : IPostService
 
     public async Task<PostReadDTO> UpdatePost(int id, PostUpdateDto postDto)
     {
-        var post = await _context.posts
-        .Include(c => c.Category)
-        .Include(pt => pt.Tags)
-        .ThenInclude(t => t.Tag)
-        .FirstOrDefaultAsync(p => p.Id == id);
+        var post = await _postRepository.GetPostByIdAsync(id);
         if (post == null)
-        {
             return null;
-        }
+            
         if (postDto.Title != null)
         {
             post.Title = postDto.Title;
@@ -155,30 +134,28 @@ public class PostService : IPostService
         }
         if (postDto.Category != null)
         {
-            var category = await _context.categories
-                .FirstOrDefaultAsync(c => c.Name == postDto.Category);
+            var category = await _categoryRepository.GetCategoryByNameAsync(postDto.Category);
             if (category == null)
             {
                 category = new Category { Name = postDto.Category };
-                _context.categories.Add(category);
             }
             post.CategoryId = category.Id;
             post.Category = category;
         }
         post.UpdatedAt = postDto.UpdatedAt;
         post.Tags.Clear();
-        foreach (var tag in postDto.Tags)
+        foreach (var tagName in postDto.Tags)
         {
-            var existingTag = await _context.tags
-                .FirstOrDefaultAsync(t => t.Name == tag);
-            if (existingTag == null)
+            var tag = await _tagRepository.GetTagByNameAsync(tagName);
+            if (tag == null)
             {
-                existingTag = new Tag { Name = tag };
-                _context.tags.Add(existingTag);
+                tag = await _tagRepository.CreateTagAsync(tagName);
             }
-            post.Tags.Add(new PostTags { Post = post, Tag = existingTag });
+            post.Tags.Add(new PostTags { Post = post, Tag = tag });
         }
-        await _context.SaveChangesAsync();
+
+        _postRepository.UpdatePost(post);
+        await _unitOfWork.CompleteAsync();
 
         return await GetPostById(post.Id);
     }

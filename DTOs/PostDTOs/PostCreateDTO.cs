@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using BloggingPlatfromAPI.Model;
 namespace BloggingPlatfromAPI.DTOs;
 
 public record class PostCreateDTO
@@ -12,7 +11,6 @@ public record class PostCreateDTO
     public string Category { get; set; } = "";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-    [Required]
-    public List<string> Tags = new List<string>();
+    public List<string> Tags { get; set; } = new List<string>();
 
 }
