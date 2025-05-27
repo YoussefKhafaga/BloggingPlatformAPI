@@ -4,6 +4,7 @@ using BloggingPlatfromAPI.DTOs;
 using BloggingPlatfromAPI.DTOs.PostDTOs;
 using BloggingPlatfromAPI.Helpers;
 using BloggingPlatfromAPI.Model;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace BloggingPlatfromAPI.Services.PostService;
@@ -70,9 +71,43 @@ public class PostService : IPostService
 
     }
 
-    public Task<PageResult<PostReadDTO>> GetAllPosts()
+    public async Task<PageResult<PostReadDTO>> GetAllPosts([FromQuery] string? term, [FromQuery] int pageNumber, [FromQuery] int PageSize)
     {
-        throw new NotImplementedException();
+        var query = _context.posts
+        .Include(category => category.Category)
+        .Include(postTag => postTag.Tags)
+        .ThenInclude(postTag => postTag.Tag)
+        .AsQueryable();
+
+        if (!string.IsNullOrEmpty(term))
+        {
+            term = term.ToLower();
+            query = query.Where(post => post.Title.ToLower().Contains(term) || post.Content.ToLower().Contains(term) || post.Category.Name.ToLower().Contains(term));
+        }
+        var totalItems = await query.CountAsync();
+        var posts = await query
+        .Skip((pageNumber - 1) * PageSize)
+        .Take(PageSize)
+        .ToListAsync();
+
+        var postDtos = posts.Select(post => new PostReadDTO
+        {
+            Id = post.Id,
+            Title = post.Title,
+            Content = post.Content,
+            CreatedAt = post.CreatedAt,
+            UpdatedAt = post.UpdatedAt,
+            Category = post.Category?.Name,
+            Tags = post.Tags.Select(tag => tag.Tag.Name).ToList()
+        });
+
+        return new PageResult<PostReadDTO>
+        {
+            Items = postDtos.ToList(),
+            TotalCount = totalItems,
+            PageNumber = pageNumber,
+            PageSize = PageSize
+        };
     }
 
     public async Task<PostReadDTO> GetPostById(int id)
@@ -98,10 +133,6 @@ public class PostService : IPostService
 
     }
 
-    public Task<IEnumerable<PostReadDTO>> GetPostByWildCard(string wildCard)
-    {
-        throw new NotImplementedException();
-    }
 
     public async Task<PostReadDTO> UpdatePost(int id, PostUpdateDto postDto)
     {

@@ -16,7 +16,7 @@ namespace BloggingPlatfromAPI.Controllers
             _postService = postService;
         }
 
-        [HttpPost]
+        [HttpPost("post")]
         [ProducesResponseType(400)]
         [ProducesResponseType(typeof(PostReadDTO), 201)]
         public async Task<IActionResult> CreatePost([FromBody] PostCreateDTO postCreateDTO)
@@ -35,12 +35,22 @@ namespace BloggingPlatfromAPI.Controllers
             return CreatedAtAction(nameof(GetPostById), new { id = createdPost.Id }, createdPost);
         }
 
-        [HttpGet]
-        public async Task<IActionResult> Get()
+        [HttpGet("posts")]
+        [ProducesResponseType(404)]
+        [ProducesResponseType(200)]
+        public async Task<IActionResult> GetPosts([FromQuery] string? term, [FromQuery] int pageNumber, [FromQuery] int PageSize)
         {
-            return Ok(await _postService.GetAllPosts());
+            var posts = await _postService.GetAllPosts(term, pageNumber, PageSize);
+            if (posts == null)
+            {
+                return NotFound("No posts found.");
+            }
+            return Ok(posts);
         }
+
         [HttpGet("{id}")]
+        [ProducesResponseType(404)]
+        [ProducesResponseType(200)]
         public async Task<IActionResult> GetPostById(int id)
         {
             var post = await _postService.GetPostById(id);
@@ -62,6 +72,7 @@ namespace BloggingPlatfromAPI.Controllers
             }
             return NoContent();
         }
+
         [HttpPut("{id}")]
         [ProducesResponseType(400)]
         [ProducesResponseType(typeof(PostReadDTO), 200)]
